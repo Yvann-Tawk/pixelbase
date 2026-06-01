@@ -43,8 +43,10 @@ function initGoogleAuth() {
           gapi.client.setToken({ access_token: googleToken });
           STATE.googleConnected = true;
           saveState(STATE);
-          fetchGmail();
-          fetchCalendar();
+          whenGapiReady(() => {
+            if (typeof renderGmail === "function") renderGmail();
+            if (typeof renderCalendar === "function") renderCalendar();
+          });
         }
       },
     });
@@ -52,6 +54,12 @@ function initGoogleAuth() {
   } catch (e) {
     console.warn("GIS init failed", e);
   }
+}
+
+function whenGapiReady(cb, tries = 0) {
+  if (gapiReady) return cb();
+  if (tries > 40) return;
+  setTimeout(() => whenGapiReady(cb, tries + 1), 250);
 }
 
 function googleSignIn() {
@@ -67,17 +75,18 @@ async function fetchGmail() {
   if (!gapiReady || !googleToken) return;
   try {
     const list = await gapi.client.gmail.users.messages.list({
-      userId: "me", maxResults: 5, labelIds: ["INBOX"], q: "is:unread",
+      userId: "me", maxResults: 4, labelIds: ["INBOX"], q: "is:unread",
     });
     const msgs = list.result.messages || [];
     $("gmail-count").textContent = `${msgs.length} NEW`;
     if (!msgs.length) { body.innerHTML = `<div class="empty-state">Inbox zero. Nice.</div>`; return; }
     body.innerHTML = "";
-    for (const m of msgs) {
-      const full = await gapi.client.gmail.users.messages.get({
-        userId: "me", id: m.id, format: "metadata",
-        metadataHeaders: ["From", "Subject"],
-      });
+    const fetches = msgs.map(m => gapi.client.gmail.users.messages.get({
+      userId: "me", id: m.id, format: "metadata",
+      metadataHeaders: ["From", "Subject"],
+    }));
+    const results = await Promise.all(fetches);
+    results.forEach(full => {
       const h = full.result.payload.headers;
       const from = (h.find(x => x.name === "From") || {}).value || "";
       const subj = (h.find(x => x.name === "Subject") || {}).value || "(no subject)";
@@ -87,7 +96,7 @@ async function fetchGmail() {
       row.innerHTML = `<div class="email-sender">${esc(sender.slice(0, 28))}</div>
         <div class="email-preview">${esc(subj)}</div>`;
       body.appendChild(row);
-    }
+    });
   } catch (e) {
     body.innerHTML = `<div class="empty-state">Gmail error. Reconnect in settings.</div>`;
   }

@@ -227,15 +227,15 @@ function renderGmail() {
     $("gmail-count").textContent = "—";
     return;
   }
-  if (!STATE.googleConnected) {
-    body.innerHTML = `<div class="empty-state">Ready to connect.</div>
-      <button class="px-btn px-btn-sm" id="gmail-connect">CONNECT GOOGLE</button>`;
-    const btn = $("gmail-connect");
-    if (btn) btn.onclick = googleSignIn;
+  if (typeof googleToken !== "undefined" && googleToken) {
+    body.innerHTML = `<div class="empty-state">Loading inbox...</div>`;
+    if (typeof fetchGmail === "function") fetchGmail();
     return;
   }
-  body.innerHTML = `<div class="empty-state">Loading inbox...</div>`;
-  if (typeof fetchGmail === "function") fetchGmail();
+  body.innerHTML = `<div class="empty-state">Ready to connect.</div>
+    <button class="px-btn px-btn-sm" id="gmail-connect">CONNECT GOOGLE</button>`;
+  const btn = $("gmail-connect");
+  if (btn) btn.onclick = googleSignIn;
 }
 
 /* ============================================================
@@ -247,12 +247,12 @@ function renderCalendar() {
     body.innerHTML = `<div class="empty-state">Add Google Client ID in settings &#9881;</div>`;
     return;
   }
-  if (!STATE.googleConnected) {
-    body.innerHTML = `<div class="empty-state">Connect Google in the Gmail card.</div>`;
+  if (typeof googleToken !== "undefined" && googleToken) {
+    body.innerHTML = `<div class="empty-state">Loading events...</div>`;
+    if (typeof fetchCalendar === "function") fetchCalendar();
     return;
   }
-  body.innerHTML = `<div class="empty-state">Loading events...</div>`;
-  if (typeof fetchCalendar === "function") fetchCalendar();
+  body.innerHTML = `<div class="empty-state">Connect Google in the Gmail card.</div>`;
 }
 
 /* ============================================================
