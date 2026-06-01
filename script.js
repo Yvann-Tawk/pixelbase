@@ -262,16 +262,43 @@ function renderBooks() {
   const body = $("book-body");
   body.innerHTML = "";
   if (!CFG.books.length) { body.innerHTML = `<div class="empty-state">Add a book in settings</div>`; return; }
-  CFG.books.forEach(b => {
+  CFG.books.forEach((b, i) => {
+    const unit = b.unit || "pg";
     const pct = Math.min(100, Math.round((b.current / b.goal) * 100));
     const el = document.createElement("div");
     el.className = "book-item";
     el.innerHTML = `
       <div class="book-title">${esc(b.title)}</div>
-      <div class="book-stat"><span>${b.current.toLocaleString()} / ${b.goal.toLocaleString()}</span><span>${pct}%</span></div>
-      <div class="pbar"><div class="pbar-fill purple" style="width:${pct}%"></div></div>`;
+      <div class="book-stat">
+        <span class="book-stepper">
+          <button class="step-btn" data-i="${i}" data-d="-1">&minus;</button>
+          <span class="book-current">${b.current.toLocaleString()}</span> / ${b.goal.toLocaleString()} ${esc(unit)}
+          <button class="step-btn" data-i="${i}" data-d="1">+</button>
+        </span>
+        <span>${pct}%</span>
+      </div>
+      <div class="pbar"><div class="pbar-fill purple" style="width:${pct}%"></div></div>
+      ${b.link ? `<a class="book-link" href="${esc(b.link)}" target="_blank" rel="noopener">GOODREADS SHELF &rarr;</a>` : ""}`;
+    el.querySelectorAll(".step-btn").forEach(btn => {
+      btn.onclick = () => {
+        const idx = +btn.dataset.i, d = +btn.dataset.d;
+        const stepBig = unit === "words" ? 250 : 1;
+        CFG.books[idx].current = Math.max(0, CFG.books[idx].current + d * stepBig);
+        saveConfig(CFG); renderBooks();
+      };
+    });
     body.appendChild(el);
   });
+}
+function wireBookEdit() {
+  $("book-edit").onclick = () => {
+    if (!CFG.books.length) return;
+    const b = CFG.books[0];
+    const v = prompt(`Current ${b.unit || "pg"} read (of ${b.goal})?`, b.current);
+    if (v === null) return;
+    CFG.books[0].current = Math.max(0, parseInt(v) || 0);
+    saveConfig(CFG); renderBooks();
+  };
 }
 
 /* ============================================================
@@ -333,33 +360,82 @@ function renderMedication() {
 }
 
 /* ============================================================
-   MUSIC / VINYL
+   MUSIC — YOUTUBE PLAYER
    ============================================================ */
-const MUSIC_SERVICES = {
-  spotify:  { label: "SPOTIFY",  url: "https://open.spotify.com" },
-  anghami:  { label: "ANGHAMI",  url: "https://play.anghami.com" },
-  youtube:  { label: "YOUTUBE",  url: "https://youtube.com" },
-  ytmusic:  { label: "YT MUSIC", url: "https://music.youtube.com" },
-};
-function renderMusic() {
-  const m = CFG.music;
-  const svc = MUSIC_SERVICES[m.service] || MUSIC_SERVICES.spotify;
-  $("music-track").textContent = (m.track || "NO TRACK").toUpperCase();
-  $("music-artist").textContent = m.artist || "—";
-  $("music-service-badge").textContent = svc.label;
-  if (m.art) $("vinyl-art").style.backgroundImage = `url('${m.art}')`;
-  const open = $("music-open");
-  open.href = svc.url;
-  open.innerHTML = `&#9654; OPEN ${svc.label}`;
+let ytPlayer = null;
+let ytApiReady = false;
+let ytPendingId = null;
+
+function onYouTubeIframeAPIReady() {
+  ytApiReady = true;
+  if (ytPendingId) { createYtPlayer(ytPendingId); ytPendingId = null; }
 }
-function wireMusic() {
-  const vinyl = $("vinyl");
-  let playing = false;
-  $("music-play").addEventListener("click", () => {
-    playing = !playing;
-    vinyl.classList.toggle("playing", playing);
-    $("music-play").innerHTML = playing ? "&#9208;" : "&#9199;";
+window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
+function parseYtId(input) {
+  const s = input.trim();
+  let m = s.match(/[?&]v=([\w-]+)/);            if (m) return { id: m[1], type: "video" };
+  m = s.match(/[?&]list=([\w-]+)/);              if (m) return { id: m[1], type: "playlist" };
+  m = s.match(/youtu\.be\/([\w-]+)/);            if (m) return { id: m[1], type: "video" };
+  if (/^[\w-]{11}$/.test(s))                     return { id: s, type: "video" };
+  if (/^(PL|UU|LL|RD|OL)[\w-]+$/.test(s))        return { id: s, type: "playlist" };
+  return { id: s, type: "video" };
+}
+
+function createYtPlayer(item) {
+  const empty = $("yt-empty");
+  if (empty) empty.style.display = "none";
+  const cfg = item.type === "playlist"
+    ? { listType: "playlist", list: item.id }
+    : { videoId: item.id };
+  if (ytPlayer) {
+    if (item.type === "playlist") ytPlayer.loadPlaylist({ list: item.id });
+    else ytPlayer.loadVideoById(item.id);
+    return;
+  }
+  ytPlayer = new YT.Player("yt-player", {
+    height: "180", width: "100%",
+    playerVars: { playsinline: 1, ...cfg, rel: 0, modestbranding: 1 },
+    events: {},
   });
+}
+
+function playYt(item) {
+  if (!ytApiReady || typeof YT === "undefined" || !YT.Player) { ytPendingId = item; return; }
+  createYtPlayer(item);
+}
+
+function renderMusic() {
+  const list = $("yt-list");
+  list.innerHTML = "";
+  const items = (CFG.music.playlist || []);
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state" style="font-size:16px">Add a song or playlist with +</div>`;
+  }
+  items.forEach((it, i) => {
+    const row = document.createElement("div");
+    row.className = "yt-item";
+    row.innerHTML = `<span class="yt-item-title">&#9654; ${esc(it.title)}</span>
+      <button class="news-del" data-i="${i}">&times;</button>`;
+    row.querySelector(".yt-item-title").onclick = () => playYt(it);
+    row.querySelector(".news-del").onclick = (e) => {
+      e.stopPropagation();
+      CFG.music.playlist.splice(i, 1); saveConfig(CFG); renderMusic();
+    };
+    list.appendChild(row);
+  });
+}
+
+function wireMusic() {
+  $("music-add").onclick = () => {
+    const title = prompt("Name for this song/playlist?");
+    if (!title) return;
+    const raw = prompt("YouTube link or ID (video or playlist):");
+    if (!raw) return;
+    const parsed = parseYtId(raw);
+    CFG.music.playlist.push({ title, id: parsed.id, type: parsed.type });
+    saveConfig(CFG); renderMusic();
+  };
 }
 
 /* ============================================================
@@ -369,15 +445,30 @@ function renderProgress() {
   const body = $("progress-body");
   body.innerHTML = `<div class="progress-grid"></div>`;
   const grid = body.querySelector(".progress-grid");
-  CFG.progress.forEach(p => {
+  CFG.progress.forEach((p, i) => {
     const el = document.createElement("div");
     el.className = "progress-item";
     const color = p.color === "purple" ? "purple" : p.color === "green" ? "green" : "";
     el.innerHTML = `
       <div class="progress-label"><span>${esc(p.label)}</span><span class="progress-pct">${p.pct}%</span></div>
-      <div class="pbar"><div class="pbar-fill ${color}" style="width:${p.pct}%"></div></div>`;
+      <div class="pbar pbar-click" data-i="${i}" title="Click to set"><div class="pbar-fill ${color}" style="width:${p.pct}%"></div></div>`;
+    const bar = el.querySelector(".pbar-click");
+    bar.onclick = (e) => {
+      const rect = bar.getBoundingClientRect();
+      const newPct = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+      CFG.progress[i].pct = newPct; saveConfig(CFG); renderProgress();
+    };
     grid.appendChild(el);
   });
+}
+function wireProgressEdit() {
+  $("progress-edit").onclick = () => {
+    CFG.progress.forEach((p, i) => {
+      const v = prompt(`${p.label} — progress %?`, p.pct);
+      if (v !== null) CFG.progress[i].pct = Math.max(0, Math.min(100, parseInt(v) || 0));
+    });
+    saveConfig(CFG); renderProgress();
+  };
 }
 
 /* ============================================================
@@ -470,17 +561,34 @@ function renderProjects() {
   const body = $("projects-body");
   body.innerHTML = `<div class="projects-grid"></div>`;
   const grid = body.querySelector(".projects-grid");
-  CFG.projects.forEach(p => {
-    const card = document.createElement(p.link ? "a" : "div");
+  CFG.projects.forEach((p, i) => {
+    const card = document.createElement("div");
     card.className = "project-card";
-    if (p.link) { card.href = p.link; card.target = "_blank"; card.rel = "noopener"; }
     card.innerHTML = `
       <div class="project-name">${esc(p.name)}</div>
       <div class="project-type">${esc(p.type)}</div>
-      <div class="pbar"><div class="pbar-fill" style="width:${p.pct}%"></div></div>
-      <div class="project-pct">${p.pct}%</div>`;
+      <div class="pbar pbar-click" data-i="${i}" title="Click to set %"><div class="pbar-fill" style="width:${p.pct}%"></div></div>
+      <div class="project-foot">
+        <span class="project-pct">${p.pct}%</span>
+        ${p.link ? `<a class="project-link" href="${esc(p.link)}" target="_blank" rel="noopener">DRIVE &rarr;</a>` : ""}
+      </div>`;
+    const bar = card.querySelector(".pbar-click");
+    bar.onclick = (e) => {
+      const rect = bar.getBoundingClientRect();
+      const newPct = Math.max(0, Math.min(100, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+      CFG.projects[i].pct = newPct; saveConfig(CFG); renderProjects();
+    };
     grid.appendChild(card);
   });
+}
+function wireProjectsEdit() {
+  $("projects-edit").onclick = () => {
+    CFG.projects.forEach((p, i) => {
+      const v = prompt(`${p.name} — progress %?`, p.pct);
+      if (v !== null) CFG.projects[i].pct = Math.max(0, Math.min(100, parseInt(v) || 0));
+    });
+    saveConfig(CFG); renderProjects();
+  };
 }
 
 /* ============================================================
@@ -510,24 +618,17 @@ function buildSettings() {
     field("URL / path", "set-bg-url", CFG.background.url, "assets/backgrounds/yours.gif"),
   ]));
 
-  b.appendChild(group("MUSIC", [
-    selectField("Service", "set-music-service", ["spotify","anghami","youtube","ytmusic"], CFG.music.service),
-    field("Track", "set-music-track", CFG.music.track),
-    field("Artist", "set-music-artist", CFG.music.artist),
-    field("Album art URL", "set-music-art", CFG.music.art),
-  ]));
-
   b.appendChild(listGroup("PROJECTS", "projects", CFG.projects,
-    [["name","Name"],["type","Type"],["pct","%"],["link","Drive link"]]));
+    [["name","Name"],["type","Type"],["link","Drive link"]]));
 
   b.appendChild(listGroup("BOOKS", "books", CFG.books,
-    [["title","Title"],["current","Words"],["goal","Goal"]]));
+    [["title","Title"],["goal","Goal"],["unit","pg/words"],["link","Goodreads link"]]));
 
   b.appendChild(listGroup("MEDICATION", "medication", CFG.medication,
     [["name","Name"],["dose","Dose"],["time","Time"]]));
 
   b.appendChild(listGroup("PROGRESS TRACKERS", "progress", CFG.progress,
-    [["label","Label"],["pct","%"],["color","Color"]]));
+    [["label","Label"],["color","Color (gold/purple/green)"]]));
 
   b.appendChild(group("API KEYS (optional)", [
     field("Google Client ID", "set-gcid", CFG.api.googleClientId),
@@ -608,23 +709,23 @@ function collectSettings() {
   CFG.commute.office = $("set-office").value;
   CFG.background.type = $("set-bg-type").value;
   CFG.background.url = $("set-bg-url").value;
-  CFG.music.service = $("set-music-service").value;
-  CFG.music.track = $("set-music-track").value;
-  CFG.music.artist = $("set-music-artist").value;
-  CFG.music.art = $("set-music-art").value;
   CFG.api.googleClientId = $("set-gcid").value;
   CFG.api.tomtomKey = $("set-tomtom").value;
   CFG.api.openWeatherKey = $("set-owm").value;
 
-  // list groups
+  // list groups (definitional fields only — live values like pct/current are edited on the cards)
   ["projects","books","medication","progress"].forEach(key => {
     document.querySelectorAll(`#list-${key} input`).forEach(inp => {
       const i = +inp.dataset.idx, f = inp.dataset.field;
       if (!CFG[key][i]) CFG[key][i] = {};
       let v = inp.value;
-      if (f === "pct" || f === "current" || f === "goal") v = parseInt(v) || 0;
+      if (f === "goal") v = parseInt(v) || 0;
       CFG[key][i][f] = v;
     });
+    // ensure live-value fields exist with sane defaults
+    if (key === "projects") CFG.projects.forEach(p => { if (p.pct == null) p.pct = 0; });
+    if (key === "progress") CFG.progress.forEach(p => { if (p.pct == null) p.pct = 0; });
+    if (key === "books") CFG.books.forEach(b => { if (b.current == null) b.current = 0; if (!b.unit) b.unit = "pg"; });
   });
   saveConfig(CFG);
 }
@@ -699,6 +800,9 @@ function init() {
   wireCaffeine();
   wireMood();
   wireMusic();
+  wireBookEdit();
+  wireProgressEdit();
+  wireProjectsEdit();
   wireSettings();
   renderBackground();
   bootLoader();

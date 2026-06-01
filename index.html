@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="style.css" />
 <script src="https://apis.google.com/js/api.js" async defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
 
@@ -107,7 +108,7 @@
     </section>
 
     <section class="card c-book">
-      <div class="card-head"><span>BOOK LOG</span></div>
+      <div class="card-head"><span>BOOK LOG</span><button class="mini-btn" id="book-edit" aria-label="Update progress">&#9998;</button></div>
       <div class="card-body" id="book-body"></div>
     </section>
 
@@ -135,31 +136,20 @@
     </section>
 
     <section class="card c-music">
-      <div class="card-head"><span>NOW SPINNING</span><span class="badge" id="music-service-badge">SPOTIFY</span></div>
+      <div class="card-head"><span>MUSIC PLAYER</span><button class="mini-btn" id="music-add" aria-label="Add">+</button></div>
       <div class="card-body music-body">
-        <div class="vinyl" id="vinyl">
-          <div class="vinyl-disc">
-            <div class="vinyl-groove g1"></div>
-            <div class="vinyl-groove g2"></div>
-            <div class="vinyl-groove g3"></div>
-            <div class="vinyl-art" id="vinyl-art"></div>
-            <div class="vinyl-hole"></div>
-          </div>
+        <div class="yt-frame-wrap">
+          <div id="yt-player"></div>
+          <div class="yt-empty" id="yt-empty">Add a song or playlist &#9657;</div>
         </div>
-        <div class="music-track" id="music-track">NO TRACK</div>
-        <div class="music-artist" id="music-artist">—</div>
-        <div class="music-controls">
-          <button class="music-btn" id="music-prev" aria-label="Previous">&#9198;</button>
-          <button class="music-btn" id="music-play" aria-label="Play/Pause">&#9199;</button>
-          <button class="music-btn" id="music-next" aria-label="Next">&#9197;</button>
-        </div>
-        <a class="px-btn px-btn-sm" id="music-open" href="#" target="_blank" rel="noopener">&#9654; OPEN APP</a>
+        <div class="yt-list" id="yt-list"></div>
+        <a class="px-btn px-btn-sm" id="music-open" href="https://music.youtube.com" target="_blank" rel="noopener">&#9654; OPEN YT MUSIC</a>
       </div>
     </section>
 
     <!-- ROW: Progress / Tarot / Brain Dump / News -->
     <section class="card c-progress">
-      <div class="card-head"><span>WORK PROGRESS</span></div>
+      <div class="card-head"><span>WORK PROGRESS</span><button class="mini-btn" id="progress-edit" aria-label="Edit">&#9998;</button></div>
       <div class="card-body" id="progress-body"></div>
     </section>
 
@@ -191,7 +181,7 @@
 
     <!-- BOTTOM FULL ROW: Projects -->
     <section class="card c-projects">
-      <div class="card-head"><span>ONGOING PROJECTS &amp; QUESTS</span></div>
+      <div class="card-head"><span>ONGOING PROJECTS &amp; QUESTS</span><button class="mini-btn" id="projects-edit" aria-label="Edit">&#9998;</button></div>
       <div class="card-body projects-body" id="projects-body"></div>
     </section>
 

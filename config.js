@@ -34,8 +34,10 @@ const PIXELBASE_DEFAULTS = {
   ],
 
   // ---- BOOKS ----
+  // Track by pages or words. Bump "current" from the card itself.
+  // Goodreads shut their public API in 2020, so this is manual + an optional shelf link.
   books: [
-    { title: "What God Left Behind — Book 1", current: 18000, goal: 90000 },
+    { title: "What God Left Behind — Book 1", current: 40, goal: 300, unit: "pg", link: "" },
   ],
 
   // ---- WORK PROGRESS (custom trackers) ----
@@ -57,14 +59,13 @@ const PIXELBASE_DEFAULTS = {
     { label: "Letterboxd",  url: "https://letterboxd.com" },
   ],
 
-  // ---- MUSIC ----
-  // service: "spotify" | "anghami" | "youtube" | "ytmusic"
-  // Set your current track manually; the OPEN APP button launches your service.
+  // ---- MUSIC (YouTube player) ----
+  // Saved songs/playlists. Add from the card with the + button.
+  // id = YouTube video ID or playlist ID.
   music: {
-    service: "spotify",
-    track:  "Wish You Were Here",
-    artist: "Pink Floyd",
-    art:    "",
+    playlist: [
+      { title: "lofi hip hop radio", id: "jfKfPfyJRdk", type: "video" },
+    ],
   },
 
   // ---- FORTUNES (rotates daily) ----
